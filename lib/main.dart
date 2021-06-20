@@ -1,113 +1,181 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:http/http.dart' as http;
 
-void main() {
-  runApp(MyApp());
+Future<List<User>> fetchpp(http.Client client) async {
+  final response =
+      await client.get(Uri.parse('https://fakeface.rest/face/json'));
+
+  return compute(parser, response.body);
 }
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+List<User> parser(String responseBody) {
+  final parsed = jsonDecode(responseBody).cast<Map<String, dynamic>>();
+
+  return parsed.map<User>((json) => User.fromJson(json)).toList();
+}
+
+class User {
+  final int age;
+  final String gender;
+  final String imageUrl;
+
+  User({
+    required this.age,
+    required this.gender,
+    required this.imageUrl,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      age: json['age'] as int,
+      gender: json['title'] as String,
+      imageUrl: json['url'] as String,
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
+late List<CameraDescription> cameras;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
+  cameras = await availableCameras();
+  runApp(MaterialApp(home: CameraApp()));
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class CameraApp extends StatefulWidget {
+  @override
+  _CameraAppState createState() => _CameraAppState();
+}
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+class _CameraAppState extends State<CameraApp> {
+  late CameraController controller;
+  @override
+  void initState() {
+    super.initState();
+    controller = CameraController(cameras[0], ResolutionPreset.max);
+    controller.initialize().then((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
     });
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    if (!controller.value.isInitialized) {
+      return Container();
+    }
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        leading: Icon(Icons.arrow_back, color: Colors.black),
+        title: Text("Savings", style: TextStyle(color: Colors.black)),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Align(
+            child: Text(
+              "Pay Through UPI",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17.0),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            alignment: Alignment.centerLeft,
+            widthFactor: 2.9,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 10.0, left: 15.0, right: 15.0),
+            child: TextField(
+              decoration: InputDecoration(
+                  contentPadding: EdgeInsets.all(2),
+                  border: UnderlineInputBorder(),
+                  hintText: 'Enter UPI Number'),
             ),
-          ],
-        ),
+          ),
+          // Transform.scale(
+          //   scale: 1,
+          //   child: Center(
+          //     child: AspectRatio(
+          //       aspectRatio: 1,
+          //       child: CameraPreview(controller),
+          //     ),
+          //   ),
+          // ),
+
+          SizedBox(height: 75.0),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.blueAccent),
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      suffixIcon: Icon(Icons.book),
+                      //contentPadding: EdgeInsets.only(top: 0, left: 25),
+                      hintText: 'Select Number',
+                      hintStyle: TextStyle(fontSize: 17.0),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide(color: Colors.transparent),
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  child: FutureBuilder<List<User>>(
+                    future: fetchpp(http.Client()),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) print(snapshot.error);
+                      if (snapshot.hasData) print("FJHSBZFHBJHCBJHCBHSHJV");
+
+                      return snapshot.hasData
+                          ? UserList(photos: snapshot.data!)
+                          : Center(child: CircularProgressIndicator());
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+}
+
+class UserList extends StatelessWidget {
+  final List<User> photos;
+
+  UserList({Key? key, required this.photos}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: photos.length,
+      itemBuilder: (context, index) {
+        return Column(children: [
+          Text("$photos[index].age"),
+          Text(photos[index].imageUrl),
+          Text(photos[index].gender)
+        ]);
+      },
     );
   }
 }
